@@ -46,9 +46,13 @@
             padding: 5px 10px;
             font-size: 14px;
             margin: 2px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
         }
-        .btn-mais { background: #00e054; }
-        .btn-menos { background: #ff4242; }
+        .btn-mais { background: #00e054; color: #fff; }
+        .btn-menos { background: #ff4242; color: #fff; }
         #loading { color: #ff8000; font-weight: bold; display: none; }
     </style>
 </head>
@@ -56,12 +60,12 @@
 
 <div class="container">
     <h1>🎬 Letterboxd Watchlist Picker</h1>
-    <p>Insere o teu username para sortear 3 filmes:</p>
+    <p>Insere o teu username (atualiza automaticamente sempre que adicionas filmes!):</p>
     
     <input type="text" id="username" placeholder="Teu username do Letterboxd">
     <button onclick="carregarWatchlist()">Carregar</button>
     
-    <div id="loading">A carregar filmes da tua watchlist...</div>
+    <div id="loading">A ler os teus filmes em tempo real...</div>
     <div id="lista-filmes"></div>
 </div>
 
@@ -77,33 +81,33 @@ async function carregarWatchlist() {
 
     const urlRSS = `https://letterboxd.com/${username}/watchlist/rss/`;
     
-    // Usando uma ponte alternativa que converte o RSS diretamente para JSON (mais fácil para o browser ler)
-    const urlProxy = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(urlRSS)}`;
+    // Este proxy usa trabalhadores da Cloudflare, o Letterboxd aceita-o muito melhor!
+    const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlRSS)}`;
 
     try {
         const resposta = await fetch(urlProxy);
-        if (!resposta.ok) throw new Error("Erro ao converter RSS");
+        if (!resposta.ok) throw new Error("Erro na rede");
         
         const dados = await resposta.json();
-
-        if (dados.status !== 'ok') {
-            throw new Error("O conversor não conseguiu ler o feed");
-        }
+        
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(dados.contents, "text/xml");
+        const items = xmlDoc.getElementsByTagName("item");
 
         todosFilmes = [];
-        // O rss2json já nos dá os items mastigados num array!
-        dados.items.forEach(item => {
-            todosFilmes.push(item.title);
-        });
+        for (let i = 0; i < items.length; i++) {
+            const titulo = items[i].getElementsByTagName("title")[0].textContent;
+            todosFilmes.push(titulo);
+        }
 
         if (todosFilmes.length === 0) {
-            alert("Não encontrámos filmes. Tens a certeza que o username está correto?");
+            alert("Não encontrámos filmes. Confirma se o username está correto e se a lista está pública!");
         } else {
             sortearFilmes();
         }
     } catch (erro) {
-        console.error("Erro:", erro);
-        alert("O Letterboxd bloqueou a ligação automática. Tenta atualizar a página (F5) e testar novamente.");
+        console.error(erro);
+        alert("Ocorreu um erro. Tenta clicar no botão outra vez!");
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
@@ -111,11 +115,10 @@ async function carregarWatchlist() {
 
 function sortearFilmes() {
     if (todosFilmes.length < 3) {
-        alert("Tens menos de 3 filmes na watchlist!");
+        alert("Tens menos de 3 filmes na lista!");
         return;
     }
     
-    // Baralhar e escolher 3
     const sorteados = [...todosFilmes].sort(() => 0.5 - Math.random()).slice(0, 3);
     
     const container = document.getElementById('lista-filmes');
@@ -126,8 +129,8 @@ function sortearFilmes() {
             <div class="filme-card">
                 <span class="filme-titulo">${filme}</span>
                 <div class="botoes-feedback">
-                    <button class="btn-mais" onclick="feedback('${filme}', 'mais')">👍 Mais</button>
-                    <button class="btn-menos" onclick="feedback('${filme}', 'menos')">👎 Menos</button>
+                    <button class="btn-mais" onclick="feedback('${filme.replace(/'/g, "\\'")}', 'mais')">👍 Mais</button>
+                    <button class="btn-menos" onclick="feedback('${filme.replace(/'/g, "\\'")}', 'menos')">👎 Menos</button>
                 </div>
             </div>
         `;
@@ -135,8 +138,7 @@ function sortearFilmes() {
 }
 
 function feedback(filme, tipo) {
-    alert(`Clicaste em "${tipo}" para o filme: ${filme}\n\nPróximo passo: Ligar à API do TMDB para ler os géneros e filtrar os próximos!`);
-    // Aqui vai entrar a lógica do TMDB que falámos antes
+    alert(`Clicaste em "${tipo}" para: ${filme}`);
     sortearFilmes(); 
 }
 </script>
