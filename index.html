@@ -75,36 +75,35 @@ async function carregarWatchlist() {
     document.getElementById('loading').style.display = 'block';
     document.getElementById('lista-filmes').innerHTML = '';
 
-    // URL do teu feed RSS do Letterboxd
     const urlRSS = `https://letterboxd.com/${username}/watchlist/rss/`;
     
-    // Mudámos para o proxy da Codetabs (muito mais rápido e estável para RSS)
-    const urlProxy = `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(urlRSS)}`;
+    // Usando uma ponte alternativa que converte o RSS diretamente para JSON (mais fácil para o browser ler)
+    const urlProxy = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(urlRSS)}`;
 
     try {
         const resposta = await fetch(urlProxy);
-        if (!resposta.ok) throw new Error("Erro na resposta do proxy");
+        if (!resposta.ok) throw new Error("Erro ao converter RSS");
         
-        const textoXML = await resposta.text();
-        
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(textoXML, "text/xml");
-        const items = xmlDoc.getElementsByTagName("item");
+        const dados = await resposta.json();
 
-        todosFilmes = [];
-        for (let i = 0; i < items.length; i++) {
-            const titulo = items[i].getElementsByTagName("title")[0].textContent;
-            todosFilmes.push(titulo);
+        if (dados.status !== 'ok') {
+            throw new Error("O conversor não conseguiu ler o feed");
         }
 
+        todosFilmes = [];
+        // O rss2json já nos dá os items mastigados num array!
+        dados.items.forEach(item => {
+            todosFilmes.push(item.title);
+        });
+
         if (todosFilmes.length === 0) {
-            alert("Não encontrámos filmes no feed. Tens a certeza que tens filmes guardados na Watchlist?");
+            alert("Não encontrámos filmes. Tens a certeza que o username está correto?");
         } else {
             sortearFilmes();
         }
     } catch (erro) {
         console.error("Erro:", erro);
-        alert("Ocorreu um problema ao aceder ao Letterboxd. Tenta clicar no botão outra vez!");
+        alert("O Letterboxd bloqueou a ligação automática. Tenta atualizar a página (F5) e testar novamente.");
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
