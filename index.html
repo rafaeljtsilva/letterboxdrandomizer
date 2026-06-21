@@ -21,16 +21,24 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         h1 { color: #fff; }
-        input, button {
-            padding: 10px;
-            font-size: 16px;
-            border-radius: 5px;
-            border: none;
-            margin: 5px;
+        .instrucoes {
+            text-align: left;
+            background: #24303c;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.6;
         }
-        input { width: 60%; background: #2c3842; color: #fff; text-align: center; }
-        button { background: #00e054; color: #fff; cursor: pointer; font-weight: bold; }
-        button:hover { background: #00b342; }
+        .instrucoes a { color: #00e054; text-decoration: none; font-weight: bold; }
+        input[type="file"] {
+            margin: 20px 0;
+            color: #fff;
+            background: #24303c;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
         .filme-card {
             background: #24303c;
             margin: 15px 0;
@@ -41,106 +49,85 @@
             align-items: center;
             border-left: 5px solid #ff8000;
         }
-        .filme-titulo { color: #fff; font-size: 18px; font-weight: bold; text-align: left; max-width: 70%; }
-        #loading { color: #ff8000; font-weight: bold; display: none; margin-top: 15px; }
+        .filme-titulo { color: #fff; font-size: 18px; font-weight: bold; text-align: left; }
+        button.sortear {
+            background: #00e054; color: #fff; padding: 12px 24px; font-size: 16px;
+            border-radius: 5px; border: none; cursor: pointer; font-weight: bold; margin-bottom: 15px;
+        }
+        button.sortear:hover { background: #00b342; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🎬 Letterboxd Watchlist Picker</h1>
-    <p>A extrair filmes diretamente da tua página de Shuffle!</p>
     
-    <input type="text" id="username" value="rafaeljtsilva" placeholder="Teu username do Letterboxd">
-    <br>
-    <button onclick="carregarWatchlist()">🎲 Sortear 3 Filmes</button>
+    <div class="instrucoes">
+        <strong>Como o Letterboxd bloqueia o site, faz isto (leva 10 segundos):</strong>
+        <ol>
+            <li>Entra em <a href="https://letterboxd.com/settings/data/" target="_blank">Letterboxd Settings > Data</a> e clica em <strong>"Export Your Data"</strong>.</li>
+            <li>Abre o ZIP descarregado e arrasta o ficheiro <strong>watchlist.csv</strong> para aqui:</li>
+        </ol>
+    </div>
     
-    <div id="loading">A abrir o Letterboxd e a pescar os teus filmes...</div>
+    <input type="file" id="csvFile" accept=".csv">
+    <div id="zona-sorteio" style="display:none;">
+        <button class="sortear" onclick="sortearFilmes()">🎲 Baralhar e Sortear 3</button>
+    </div>
     <div id="lista-filmes"></div>
 </div>
 
 <script>
 let todosFilmes = [];
 
-async function carregarWatchlist() {
-    const username = document.getElementById('username').value.trim().toLowerCase();
-    if (!username) return alert("Escreve o teu username!");
-    
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('lista-filmes').innerHTML = '';
+document.getElementById('csvFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    const urlWatchlist = `https://letterboxd.com/${username}/watchlist/by/shuffle/`;
-    
-    // Mudámos para o corsproxy.io que não mascara nem deforma o HTML original
-    const urlProxy = `https://corsproxy.io/?${encodeURIComponent(urlWatchlist)}`;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        const conteudo = evt.target.result;
+        processarCSV(conteudo);
+    };
+    reader.readAsText(file);
+});
 
-    try {
-        const resposta = await fetch(urlProxy);
-        if (!resposta.ok) throw new Error("Erro na rede");
-        
-        const htmlBruto = await resposta.text();
+function processarCSV(texto) {
+    const linhas = texto.split('\n');
+    todosFilmes = [];
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlBruto, "text/html");
+    // O CSV do Letterboxd tem a estrutura: Date, Name, Year, Letterboxd URL
+    for (let i = 1; i < linhas.length; i++) {
+        const linha = linhas[i].trim();
+        if (!linha) continue;
+
+        // Expressão regular para separar por vírgulas mas respeitar as aspas (filmes com vírgula no nome)
+        const colunas = linha.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || linha.split(',');
         
-        // Alvo 1: Divs que contêm o poster do filme (o Letterboxd guarda o título no 'data-film-slug' ou nos 'img')
-        const posters = doc.querySelectorAll('.poster, .film-poster');
-        
-        todosFilmes = [];
-        
-        posters.forEach(div => {
-            // Tenta ir buscar o nome de várias formas para garantir que apanha
-            let titulo = "";
-            
-            const img = div.querySelector('img');
-            if (img && img.getAttribute('alt')) {
-                titulo = img.getAttribute('alt');
-            } else if (div.getAttribute('data-film-slug')) {
-                // Se não houver imagem, limpamos o slug (ex: "pulp-fiction" vira "Pulp Fiction")
-                let slug = div.getAttribute('data-film-slug');
-                titulo = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-            }
-            
-            if (titulo && !todosFilmes.includes(titulo)) {
+        if (colunas && colunas[1]) {
+            let titulo = colunas[1].replace(/"/g, ''); // Limpa as aspas extra
+            if (titulo !== "Name") {
                 todosFilmes.push(titulo);
             }
-        });
-
-        if (todosFilmes.length === 0) {
-            // Se falhou tudo, vamos tentar procurar por links de filmes na página
-            const links = doc.querySelectorAll('a');
-            links.forEach(l => {
-                if(l.href && l.href.includes('/film/')) {
-                    let partes = l.href.split('/film/');
-                    if(partes[1]) {
-                        let nome = partes[1].replace(/\//g, '').split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                        if(nome && nome.length < 40 && !todosFilmes.includes(nome)) todosFilmes.push(nome);
-                    }
-                }
-            });
         }
+    }
 
-        if (todosFilmes.length === 0) {
-            alert("O Letterboxd enviou uma página vazia. Tenta clicar no botão mais uma vez!");
-        } else {
-            sortearFilmesNativos();
-        }
-    } catch (erro) {
-        console.error(erro);
-        alert("O servidor falhou a responder. Tenta de novo!");
-    } finally {
-        document.getElementById('loading').style.display = 'none';
+    if (todosFilmes.length === 0) {
+        alert("Não encontrámos filmes. Tens a certeza que inseriste o ficheiro 'watchlist.csv'?");
+    } else {
+        document.getElementById('zona-sorteio').style.display = 'block';
+        sortearFilmes();
     }
 }
 
-function sortearFilmesNativos() {
+function sortearFilmes() {
     if (todosFilmes.length < 3) {
-        alert("Encontrámos poucos filmes na página. Garante que tens a lista bem preenchida!");
+        alert("Precisas de pelo menos 3 filmes na tua lista!");
         return;
     }
     
-    // Mostra os 3 primeiros da página baralhada
-    const sorteados = todosFilmes.slice(0, 3);
+    // Baralha a lista completa do CSV e escolhe 3
+    const sorteados = [...todosFilmes].sort(() => 0.5 - Math.random()).slice(0, 3);
     
     const container = document.getElementById('lista-filmes');
     container.innerHTML = '<h3>As tuas 3 opções aleatórias:</h3>';
@@ -150,8 +137,8 @@ function sortearFilmesNativos() {
             <div class="filme-card">
                 <span class="filme-titulo">${filme}</span>
                 <div>
-                    <button style="margin:0 2px; padding:5px 10px; font-size:12px;" onclick="alert('Mais como este!')">👍 Mais</button>
-                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; background:#ff4242;" onclick="alert('Menos como este!')">👎 Menos</button>
+                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; border:none; border-radius:3px; background:#00e054; color:white; font-weight:bold; cursor:pointer;" onclick="alert('Mais como este!')">👍</button>
+                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; border:none; border-radius:3px; background:#ff4242; color:white; font-weight:bold; cursor:pointer;" onclick="alert('Menos como este!')">👎</button>
                 </div>
             </div>
         `;
