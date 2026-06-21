@@ -1,0 +1,65 @@
+name: Sincronizar Watchlist do Letterboxd
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Corre automaticamente de 6 em 6 horas
+  workflow_dispatch: # Permite-te correr o robô manualmente com um clique
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clonar o repositório
+      uses: actions/checkout@v3
+
+    - name: Configurar o Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-on-version: '18'
+
+    - name: Sacar dados do Letterboxd
+      run: |
+        node -e "
+        const https = require('https');
+        const fs = require('fs');
+        
+        // Substitui TEU_USER_AQUI pelo teu username entre as aspas
+        const username = 'rafaeljtsilva'; 
+        const url = 'https://letterboxd.com/' + username + '/watchlist/rss/';
+        
+        // Fingir que somos um browser real para o Cloudflare não desconfiar
+        const options = {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+        };
+        
+        https.get(url, options, (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            const matches = data.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g);
+            if (!matches) {
+              console.log('Erro ao ler os filmes. Resposta do servidor:', data.substring(0, 200));
+              process.exit(1);
+            }
+            
+            // Limpar os títulos (ignorar o primeiro que é o título do RSS)
+            const filmes = matches
+              .map(m => m.replace('<title><![CDATA[', '').replace(']]></title>', ''))
+              .filter(t => t !== 'Watchlist');
+              
+            fs.writeFileSync('watchlist.json', JSON.stringify(filmes, null, 2));
+            console.log('Sucesso! Guardados ' + filmes.length + ' filmes.');
+          });
+        }).on('error', (err) => {
+          console.error(err);
+          process.exit(1);
+        });
+        "
+
+    - name: Guardar o ficheiro no repositório
+      run: |
+        git config --global user.name 'Letterboxd Bot'
+        git config --global user.email 'bot@github.com'
+        git add watchlist.json
+        git commit -m "🤖 Sincronização automática da Watchlist" || exit 0
+        git push
