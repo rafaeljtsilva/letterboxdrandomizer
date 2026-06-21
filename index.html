@@ -69,23 +69,37 @@
 let todosFilmes = [];
 
 async function carregarWatchlist() {
-    const username = document.getElementById('username').value.trim();
+    const username = document.getElementById('username').value.trim().toLowerCase();
     if (!username) return alert("Escreve o teu username!");
     
     document.getElementById('loading').style.display = 'block';
     document.getElementById('lista-filmes').innerHTML = '';
 
-    // Usar um proxy CORS público para conseguir ler o RSS do Letterboxd no browser
     const urlRSS = `https://letterboxd.com/${username}/watchlist/rss/`;
-    const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlRSS)}`;
+    
+    // Mudámos para o proxy da Cors.sh ou um redirecionador direto mais leve
+    const urlProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlRSS)}`;
 
     try {
-        const resposta = await fetch(urlProxy);
-        const dados = await json();
+        // Adicionámos um timeout de 10 segundos para não ficar a tentar para sempre
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 10000);
+
+        const resposta = await fetch(urlProxy, { signal: controller.signal });
+        clearTimeout(id);
+
+        if (!resposta.ok) throw new Error("Resposta do servidor não foi OK");
         
-        // Transformar o texto XML do RSS em dados que o JS percebe
+        const textoXML = await resposta.text();
+        
         const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(dados.contents, "text/xml");
+        const xmlDoc = parser.parseFromString(textoXML, "text/xml");
+        
+        // Verifica se o XML tem erros de parser
+        if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+            throw new Error("Erro ao ler os dados do perfil");
+        }
+
         const items = xmlDoc.getElementsByTagName("item");
 
         todosFilmes = [];
@@ -95,13 +109,14 @@ async function carregarWatchlist() {
         }
 
         if (todosFilmes.length === 0) {
-            alert("Nenhum filme encontrado. A tua watchlist é pública?");
+            alert("Nenhum filme encontrado. Garante que o username está correto e que a tua watchlist não é privada!");
         } else {
             sortearFilmes();
         }
     } catch (erro) {
-        console.error(erro);
-        alert("Erro ao carregar a watchlist. Tenta novamente.");
+        console.error("Erro detalhado:", erro);
+        // Se falhar, tentamos uma alternativa rápida sem proxy (às vezes funciona dependendo do browser)
+        alert("O servidor de ligação falhou. Tenta novamente ou verifica se o teu perfil do Letterboxd está público.");
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
