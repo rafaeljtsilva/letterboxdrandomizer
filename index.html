@@ -71,6 +71,7 @@
             align-items: center;
             transition: transform 0.2s;
             border-bottom: 4px solid #ff8000;
+            padding-bottom: 15px;
         }
         .filme-card:hover {
             transform: translateY(-5px);
@@ -95,47 +96,24 @@
         }
 
         .filme-info {
-            padding: 15px;
+            padding: 15px 15px 0 15px;
             width: 100%;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             flex-grow: 1;
-            justify-content: space-between;
+            justify-content: center;
         }
         
         .filme-titulo {
             color: #fff;
             font-size: 16px;
             font-weight: bold;
-            margin-bottom: 12px;
-            min-height: 40px; /* Garante alinhamento mesmo com títulos longos */
+            min-height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        
-        .botoes-voto {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-        }
-        
-        .btn-voto {
-            padding: 8px 16px;
-            font-size: 16px;
-            border: none;
-            border-radius: 4px;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            flex-grow: 1;
-            transition: opacity 0.2s;
-        }
-        .btn-voto:hover { opacity: 0.8; }
-        .btn-mais { background: #00e054; }
-        .btn-menos { background: #ff4242; }
     </style>
 </head>
 <body>
@@ -187,8 +165,8 @@ function processarCSV(texto) {
         const linha = linhas[i].trim();
         if (!linha) continue;
 
-        // Separa estritamente por vírgulas, respeitando as aspas do CSV
-        const colunas = linha.match(/(".*?"|[^,]+)/g);
+        // Separa por vírgulas, respeitando as aspas do CSV
+        const colunas = inlineMatchCSV(linha);
         
         if (colunas && colunas[1] && colunas[3]) {
             let titulo = colunas[1].replace(/"/g, '').trim();
@@ -211,13 +189,33 @@ function processarCSV(texto) {
     }
 }
 
+// Função auxiliar robusta para ler as linhas do CSV sem quebrar com espaços ou vírgulas em aspas
+function inlineMatchCSV(linha) {
+    const arr = [];
+    let c = '';
+    let dentroAspas = false;
+    for (let i = 0; i < linha.length; i++) {
+        let char = linha[i];
+        if (char === '"') {
+            dentroAspas = !dentroAspas;
+        } else if (char === ',' && !dentroAspas) {
+            arr.push(c);
+            c = '';
+        } else {
+            c += char;
+        }
+    }
+    arr.push(c);
+    return arr;
+}
+
 async function sortearFilmes() {
     if (todosFilmes.length < 3) {
         alert("Precisas de pelo menos 3 filmes!");
         return;
     }
     
-    // Baralha a lista e escolhe 3
+    // Baralha a lista e escolhe 3 sem qualquer restrição de histórico
     const sorteados = [...todosFilmes].sort(() => 0.5 - Math.random()).slice(0, 3);
     const container = document.getElementById('lista-filmes');
     container.innerHTML = '<p style="color:#ff8000; width:100%;">A carregar capas do TMDB...</p>'; 
@@ -227,12 +225,10 @@ async function sortearFilmes() {
     for (let filme of sorteados) {
         let posterUrl = "";
         
-        // Só tenta ligar à API se tiveres mudado a chave temporária
         if (TMDB_API_KEY !== 'TU_CHAVE_AQUI' && TMDB_API_KEY.trim() !== '') {
             posterUrl = await procurarPosterTMDB(filme.nome);
         }
         
-        // Se houver poster, a imagem ganha o link. Se não houver, o retângulo cinzento ganha o link.
         let elementoPoster = posterUrl 
             ? `<a href="${filme.link}" target="_blank"><img class="filme-poster" src="${posterUrl}" alt="Poster"></a>`
             : `<a href="${filme.link}" target="_blank" style="text-decoration:none;"><div class="filme-poster">🎬<br><br>${filme.nome}<br><br><span style="font-size:10px; color:#8a9aa8;">Abrir no Letterboxd</span></div></a>`;
@@ -246,10 +242,6 @@ async function sortearFilmes() {
                             ${filme.nome}
                         </a>
                     </div>
-                    <div class="botoes-voto">
-                        <button class="btn-voto btn-mais" onclick="votarMais('${filme.nome.replace(/'/g, "\\'")}')">👍</button>
-                        <button class="btn-voto btn-menos" onclick="votarMenos('${filme.nome.replace(/'/g, "\\'")}')">👎</button>
-                    </div>
                 </div>
             </div>
         `;
@@ -260,7 +252,6 @@ async function sortearFilmes() {
 
 async function procurarPosterTMDB(titulo) {
     try {
-        // Limpa símbolos estranhos para a pesquisa da API ser perfeita
         const tituloLimpo = titulo.replace(/[^\w\sÀ-ÿ]/gi, '');
         const url = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY.trim()}&query=${encodeURIComponent(tituloLimpo)}&include_adult=false&language=pt-PT`;
         
@@ -279,14 +270,6 @@ async function procurarPosterTMDB(titulo) {
         console.error("Erro na ligação ao TMDB:", e);
     }
     return ""; 
-}
-
-function votarMais(nomeFilme) {
-    alert(`Gostas de: ${nomeFilme}! O algoritmo registou a tua preferência.`);
-}
-
-function votarMenos(nomeFilme) {
-    alert(`Não queres ver: ${nomeFilme}. O filme sairá dos próximos sorteios.`);
 }
 </script>
 
