@@ -5,7 +5,6 @@ on:
     - cron: '0 */6 * * *' # Corre automaticamente de 6 em 6 horas
   workflow_dispatch: # Permite-te correr o robô manualmente com um clique
 
-# Dá permissão ao robô para escrever ficheiros no repositório
 permissions:
   contents: write
 
@@ -16,52 +15,54 @@ jobs:
     - name: Clonar o repositório
       uses: actions/checkout@v4
 
-    - name: Configurar o Node.js
-      uses: actions/setup-node@v4
+    - name: Configurar o Python
+      uses: actions/setup-python@v5
       with:
-        node-version: '20' # Corrigido aqui de node-on-version para node-version
+        python-version: '3.10'
 
-    - name: Sacar dados do Letterboxd
+    - name: Instalar o Cloudscraper
+      run: pip install cloudscraper
+
+    - name: Criar script de extração
       run: |
-        node -e "
-        const https = require('https');
-        const fs = require('fs');
-        
-        // Coloca o teu username real aqui entre as aspas
-        const username = 'rafaeljtsilva'; 
-        const url = 'https://letterboxd.com/' + username + '/watchlist/rss/';
-        
-        const options = {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-        };
-        
-        https.get(url, options, (res) => {
-          let data = '';
-          res.on('data', (chunk) => { data += chunk; });
-          res.on('end', () => {
-            const matches = data.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g);
-            if (!matches) {
-              console.log('Erro ao ler os filmes. Resposta do servidor:', data.substring(0, 200));
-              process.exit(1);
-            }
+        cat << 'EOF' > extrair.py
+        import cloudscraper
+        import json
+        import re
+
+        username = 'rafaeljtsilva'
+        url = f'https://letterboxd.com/{username}/watchlist/rss/'
+
+        # Cria um scraper especial que contorna a proteção da Cloudflare
+        scraper = cloudscraper.create_scraper()
+        resposta = scraper.get(url)
+
+        if resposta.status_code != 200:
+            print(f"Erro ao passar pela Cloudflare. Status: {resposta.status_code}")
+            exit(1)
+
+        # Procura os títulos dos filmes no código do RSS
+        matches = re.findall(r'<title><!\[CDATA\[(.*?)\]\]><\/title>', resposta.text)
+        filmes = [t for t in matches if t != 'Watchlist']
+
+        if not filmes:
+            print("Não foi possível extrair filmes. O formato pode ter mudado.")
+            exit(1)
+
+        # Guarda os filmes num ficheiro JSON limpo
+        with open('watchlist.json', 'w', encoding='utf-8') as f:
+            json.dump(filmes, f, ensure_ascii=False, indent=2)
             
-            const filmes = matches
-              .map(m => m.replace('<title><![CDATA[', '').replace(']]></title>', ''))
-              .filter(t => t !== 'Watchlist');
-              
-            fs.writeFileSync('watchlist.json', JSON.stringify(filmes, null, 2));
-            console.log('Sucesso! Guardados ' + filmes.length + ' filmes.');
-          });
-        }).on('error', (err) => {
-          console.error(err);
-          process.exit(1);
-        });
-        "
+        print(f"Sucesso! {len(filmes)} filmes guardados em watchlist.json.")
+        EOF
+
+    - name: Executar o script Python
+      run: python extrair.py
 
     - name: Guardar o ficheiro no repositório
       run: |
         git config --global user.name 'Letterboxd Bot'
         git config --global user.email 'bot@github.com'
         git add watchlist.json
-        git commit -m "🤖 Sincronização automática da Watchlist" || exit 0
+        git commit -m "🤖 Sincronização automática com Cloudscraper" || exit 0
         git push
