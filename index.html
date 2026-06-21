@@ -162,7 +162,7 @@
 <script>
 // ==========================================
 // 🔑 COLA A TUA API KEY (v3 auth) AQUI:
-const TMDB_API_KEY = '15552b6ae873383f82e988c28c8a80ca'; 
+const TMDB_API_KEY = 'TU_CHAVE_AQUI'; 
 // ==========================================
 
 let todosFilmes = [];
@@ -186,13 +186,19 @@ function processarCSV(texto) {
         const linha = linhas[i].trim();
         if (!linha) continue;
 
-        // CORREÇÃO: Separa estritamente por vírgulas, respeitando aspas e ignorando espaços no meio do título
+        // Separa por vírgulas respeitando as aspas do CSV
         const colunas = linha.match(/(".*?"|[^,]+)/g);
         
-        if (colunas && colunas[1]) {
-            let titulo = colunas[1].replace(/"/g, '').trim(); // Limpa as aspas extra e espaços nas pontas
+        if (colunas && colunas[1] && colunas[3]) {
+            let titulo = colunas[1].replace(/"/g, '').trim();
+            let linkLetterboxd = colunas[3].replace(/"/g, '').trim(); // Coluna 4 tem o link do Letterboxd
+            
             if (titulo !== "Name" && titulo !== "") {
-                todosFilmes.push(titulo);
+                // Guardamos o filme como um objeto com duas informações: nome e link
+                todosFilmes.push({
+                    nome: titulo,
+                    link: linkLetterboxd
+                });
             }
         }
     }
@@ -205,6 +211,82 @@ function processarCSV(texto) {
     }
 }
 
+async function sortearFilmes() {
+    if (todosFilmes.length < 3) {
+        alert("Precisas de pelo menos 3 filmes!");
+        return;
+    }
+    
+    // Baralha a lista de objetos e escolhe 3
+    const sorteados = [...todosFilmes].sort(() => 0.5 - Math.random()).slice(0, 3);
+    const container = document.getElementById('lista-filmes');
+    container.innerHTML = '<p style="color:#ff8000; width:100%;">A carregar capas do TMDB...</p>'; 
+    
+    let htmlGerado = '';
+    
+    for (let filme of sorteados) {
+        let posterUrl = "";
+        
+        if (TMDB_API_KEY !== 'TU_CHAVE_AQUI' && TMDB_API_KEY.trim() !== '') {
+            posterUrl = await procurarPosterTMDB(filme.nome);
+        }
+        
+        let elementoPoster = posterUrl 
+            ? `<a href="${filme.link}" target="_blank"><img class="filme-poster" src="${posterUrl}" alt="Poster"></a>`
+            : `<a href="${filme.link}" target="_blank" style="text-decoration:none;"><div class="filme-poster">🎬<br><br>${filme.nome}<br><br><span style="font-size:10px; color:#8a9aa8;">Sem Capa</span></div></a>`;
+            
+        htmlGerado += `
+            <div class="filme-card">
+                ${elementoPoster}
+                <div class="filme-info">
+                    <!-- O Título agora é um link clicável que abre o Letterboxd numa nova aba -->
+                    <div class="filme-titulo">
+                        <a href="${filme.link}" target="_blank" style="color:#fff; text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='#00e054'" onmouseout="this.style.color='#fff'">
+                            ${filme.nome}
+                        </a>
+                    </div>
+                    <div class="botoes-voto">
+                        <button class="btn-voto btn-mais" onclick="votarMais('${filme.nome.replace(/'/g, "\\'")}')">👍</button>
+                        <button class="btn-voto btn-menos" onclick="votarMenos('${filme.nome.replace(/'/g, "\\'")}')">👎</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    container.innerHTML = htmlGerado;
+}
+
+async function procurarPosterTMDB(titulo) {
+    try {
+        const tituloLimpo = titulo.replace(/[^\w\sÀ-ÿ]/gi, '');
+        const url = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY.trim()}&query=${encodeURIComponent(tituloLimpo)}&include_adult=false`;
+        
+        const resposta = await fetch(url);
+        if (resposta.status === 401 || resposta.status === 403) return "";
+        
+        const dados = await resposta.json();
+        if (dados.results && dados.results.length > 0) {
+            for (let resultado of dados.results) {
+                if (resultado.poster_path) {
+                    return `https://image.tmdb.org/t/p/w500${resultado.poster_path}`;
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Erro na ligação ao TMDB:", e);
+    }
+    return ""; 
+}
+
+function votarMais(nomeFilme) {
+    alert(`Gostas de: ${nomeFilme}!`);
+}
+
+function votarMenos(nomeFilme) {
+    alert(`Não queres ver: ${nomeFilme}.`);
+}
+</script>
 async function sortearFilmes() {
     if (todosFilmes.length < 3) {
         alert("Precisas de pelo menos 3 filmes!");
