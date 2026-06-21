@@ -5,10 +5,9 @@ async function carregarWatchlist() {
     document.getElementById('loading').style.display = 'block';
     document.getElementById('lista-filmes').innerHTML = '';
 
-    // URL da página normal da tua watchlist (sem RSS!)
-    const urlWatchlist = `https://letterboxd.com/${username}/watchlist/`;
+    // O TRUQUE: Pedir a página já baralhada pelo Letterboxd!
+    const urlWatchlist = `https://letterboxd.com/${username}/watchlist/by/shuffle/`;
     
-    // Usamos o proxy AllOrigins para trazer o HTML bruto da página para o nosso código
     const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlWatchlist)}`;
 
     try {
@@ -18,11 +17,10 @@ async function carregarWatchlist() {
         const dados = await resposta.json();
         const htmlBruto = dados.contents;
 
-        // Criamos um elemento virtual para conseguir ler o HTML como se fosse uma página
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlBruto, "text/html");
         
-        // No Letterboxd, os filmes na lista têm a classe 'poster' e o título fica no atributo 'alt' da imagem
+        // Captura os posters da página baralhada
         const posters = doc.querySelectorAll('.poster img');
         
         todosFilmes = [];
@@ -34,14 +32,41 @@ async function carregarWatchlist() {
         });
 
         if (todosFilmes.length === 0) {
-            alert("Não conseguimos encontrar filmes. Garante que a tua Watchlist tem filmes visíveis publicamente!");
+            alert("Não encontrámos filmes. Confirma se o teu username está correto e se tens filmes na Watchlist!");
         } else {
-            sortearFilmes();
+            // Como a página já veio baralhada do Letterboxd, 
+            // só precisamos de tirar os 3 primeiros que aparecem!
+            sortearFilmesNativos();
         }
     } catch (erro) {
         console.error(erro);
-        alert("Erro ao aceder à página do Letterboxd. Tenta clicar novamente.");
+        alert("Erro ao aceder ao Letterboxd. Tenta clicar novamente.");
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
+}
+
+function sortearFilmesNativos() {
+    if (todosFilmes.length < 3) {
+        alert("Tens menos de 3 filmes na lista!");
+        return;
+    }
+    
+    // Como a lista já é aleatória, pegamos logo nos 3 primeiros da página
+    const sorteados = todosFilmes.slice(0, 3);
+    
+    const container = document.getElementById('lista-filmes');
+    container.innerHTML = '<h3>As tuas 3 opções aleatórias:</h3>';
+    
+    sorteados.forEach(filme => {
+        container.innerHTML += `
+            <div class="filme-card">
+                <span class="filme-titulo">${filme}</span>
+                <div>
+                    <button style="margin:0 2px; padding:5px 10px; font-size:12px;" onclick="alert('Mais como este!')">👍 Mais</button>
+                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; background:#ff4242;" onclick="alert('Menos como este!')">👎 Menos</button>
+                </div>
+            </div>
+        `;
+    });
 }
