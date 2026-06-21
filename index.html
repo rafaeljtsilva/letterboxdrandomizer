@@ -186,11 +186,12 @@ function processarCSV(texto) {
         const linha = linhas[i].trim();
         if (!linha) continue;
 
-        const colunas = linha.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || linha.split(',');
+        // CORREÇÃO: Separa estritamente por vírgulas, respeitando aspas e ignorando espaços no meio do título
+        const colunas = linha.match(/(".*?"|[^,]+)/g);
         
         if (colunas && colunas[1]) {
-            let titulo = colunas[1].replace(/"/g, '');
-            if (titulo !== "Name") {
+            let titulo = colunas[1].replace(/"/g, '').trim(); // Limpa as aspas extra e espaços nas pontas
+            if (titulo !== "Name" && titulo !== "") {
                 todosFilmes.push(titulo);
             }
         }
