@@ -1,3 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Letterboxd Randomizer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #14181c;
+            color: #9ab;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #1c252d;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        h1 { color: #fff; }
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            margin: 5px;
+        }
+        input { width: 60%; background: #2c3842; color: #fff; text-align: center; }
+        button { background: #00e054; color: #fff; cursor: pointer; font-weight: bold; }
+        button:hover { background: #00b342; }
+        .filme-card {
+            background: #24303c;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid #ff8000;
+        }
+        .filme-titulo { color: #fff; font-size: 18px; font-weight: bold; text-align: left; max-width: 70%; }
+        #loading { color: #ff8000; font-weight: bold; display: none; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎬 Letterboxd Watchlist Picker</h1>
+    <p>Vai buscar 28 filmes aleatórios de toda a tua lista e sorteia 3!</p>
+    
+    <input type="text" id="username" value="rafaeljtsilva" placeholder="Teu username do Letterboxd">
+    <br>
+    <button onclick="carregarWatchlist()">🎲 Sortear 3 Filmes</button>
+    
+    <div id="loading">A baralhar e a carregar a tua Watchlist...</div>
+    <div id="lista-filmes"></div>
+</div>
+
+<script>
+let todosFilmes = [];
+
 async function carregarWatchlist() {
     const username = document.getElementById('username').value.trim().toLowerCase();
     if (!username) return alert("Escreve o teu username!");
@@ -7,7 +71,6 @@ async function carregarWatchlist() {
 
     // O TRUQUE: Pedir a página já baralhada pelo Letterboxd!
     const urlWatchlist = `https://letterboxd.com/${username}/watchlist/by/shuffle/`;
-    
     const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlWatchlist)}`;
 
     try {
@@ -32,15 +95,13 @@ async function carregarWatchlist() {
         });
 
         if (todosFilmes.length === 0) {
-            alert("Não encontrámos filmes. Confirma se o teu username está correto e se tens filmes na Watchlist!");
+            alert("Não encontrámos filmes. Confirma se o teu username está correto e se tens filmes públicos na Watchlist!");
         } else {
-            // Como a página já veio baralhada do Letterboxd, 
-            // só precisamos de tirar os 3 primeiros que aparecem!
             sortearFilmesNativos();
         }
     } catch (erro) {
         console.error(erro);
-        alert("Erro ao aceder ao Letterboxd. Tenta clicar novamente.");
+        alert("Erro ao aceder ao Letterboxd através do proxy. Tenta clicar novamente!");
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
@@ -52,7 +113,7 @@ function sortearFilmesNativos() {
         return;
     }
     
-    // Como a lista já é aleatória, pegamos logo nos 3 primeiros da página
+    // Como a lista já veio baralhada pelo Letterboxd, pegamos logo nos 3 primeiros da página
     const sorteados = todosFilmes.slice(0, 3);
     
     const container = document.getElementById('lista-filmes');
@@ -63,10 +124,14 @@ function sortearFilmesNativos() {
             <div class="filme-card">
                 <span class="filme-titulo">${filme}</span>
                 <div>
-                    <button style="margin:0 2px; padding:5px 10px; font-size:12px;" onclick="alert('Mais como este!')">👍 Mais</button>
-                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; background:#ff4242;" onclick="alert('Menos como este!')">👎 Menos</button>
+                    <button style="margin:0 2px; padding:5px 10px; font-size:12px;" onclick="alert('Mais filmes como este!')">👍 Mais</button>
+                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; background:#ff4242;" onclick="alert('Menos filmes como este!')">👎 Menos</button>
                 </div>
             </div>
         `;
     });
 }
+</script>
+
+</body>
+</html>
