@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Letterboxd Randomizer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #14181c;
+            color: #9ab;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #1c252d;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        h1 { color: #fff; }
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            margin: 5px;
+        }
+        input { width: 60%; background: #2c3842; color: #fff; }
+        button { background: #00e054; color: #fff; cursor: pointer; font-weight: bold; }
+        button:hover { background: #00b342; }
+        .filme-card {
+            background: #24303c;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid #ff8000;
+        }
+        .filme-titulo { color: #fff; font-size: 18px; font-weight: bold; }
+        .botoes-feedback button {
+            padding: 5px 10px;
+            font-size: 14px;
+            margin: 2px;
+        }
+        .btn-mais { background: #00e054; }
+        .btn-menos { background: #ff4242; }
+        #loading { color: #ff8000; font-weight: bold; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎬 Letterboxd Watchlist Picker</h1>
+    <p>Insere o teu username para sortear 3 filmes:</p>
+    
+    <input type="text" id="username" placeholder="Teu username do Letterboxd">
+    <button onclick="carregarWatchlist()">Carregar</button>
+    
+    <div id="loading">A carregar filmes da tua watchlist...</div>
+    <div id="lista-filmes"></div>
+</div>
+
+<script>
+let todosFilmes = [];
+
+async function carregarWatchlist() {
+    const username = document.getElementById('username').value.trim();
+    if (!username) return alert("Escreve o teu username!");
+    
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('lista-filmes').innerHTML = '';
+
+    // Usar um proxy CORS público para conseguir ler o RSS do Letterboxd no browser
+    const urlRSS = `https://letterboxd.com/${username}/watchlist/rss/`;
+    const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlRSS)}`;
+
+    try {
+        const resposta = await fetch(urlProxy);
+        const dados = await json();
+        
+        // Transformar o texto XML do RSS em dados que o JS percebe
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(dados.contents, "text/xml");
+        const items = xmlDoc.getElementsByTagName("item");
+
+        todosFilmes = [];
+        for (let i = 0; i < items.length; i++) {
+            const titulo = items[i].getElementsByTagName("title")[0].textContent;
+            todosFilmes.push(titulo);
+        }
+
+        if (todosFilmes.length === 0) {
+            alert("Nenhum filme encontrado. A tua watchlist é pública?");
+        } else {
+            sortearFilmes();
+        }
+    } catch (erro) {
+        console.error(erro);
+        alert("Erro ao carregar a watchlist. Tenta novamente.");
+    } finally {
+        document.getElementById('loading').style.display = 'none';
+    }
+}
+
+function sortearFilmes() {
+    if (todosFilmes.length < 3) {
+        alert("Tens menos de 3 filmes na watchlist!");
+        return;
+    }
+    
+    // Baralhar e escolher 3
+    const sorteados = [...todosFilmes].sort(() => 0.5 - Math.random()).slice(0, 3);
+    
+    const container = document.getElementById('lista-filmes');
+    container.innerHTML = '<h3>As tuas 3 opções:</h3>';
+    
+    sorteados.forEach(filme => {
+        container.innerHTML += `
+            <div class="filme-card">
+                <span class="filme-titulo">${filme}</span>
+                <div class="botoes-feedback">
+                    <button class="btn-mais" onclick="feedback('${filme}', 'mais')">👍 Mais</button>
+                    <button class="btn-menos" onclick="feedback('${filme}', 'menos')">👎 Menos</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+function feedback(filme, tipo) {
+    alert(`Clicaste em "${tipo}" para o filme: ${filme}\n\nPróximo passo: Ligar à API do TMDB para ler os géneros e filtrar os próximos!`);
+    // Aqui vai entrar a lógica do TMDB que falámos antes
+    sortearFilmes(); 
+}
+</script>
+
+</body>
+</html>
