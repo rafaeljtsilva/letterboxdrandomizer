@@ -5,17 +5,21 @@ on:
     - cron: '0 */6 * * *' # Corre automaticamente de 6 em 6 horas
   workflow_dispatch: # Permite-te correr o robô manualmente com um clique
 
+# Dá permissão ao robô para escrever ficheiros no repositório
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - name: Clonar o repositório
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Configurar o Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-on-version: '18'
+        node-version: '20' # Corrigido aqui de node-on-version para node-version
 
     - name: Sacar dados do Letterboxd
       run: |
@@ -23,11 +27,10 @@ jobs:
         const https = require('https');
         const fs = require('fs');
         
-        // Substitui TEU_USER_AQUI pelo teu username entre as aspas
+        // Coloca o teu username real aqui entre as aspas
         const username = 'rafaeljtsilva'; 
         const url = 'https://letterboxd.com/' + username + '/watchlist/rss/';
         
-        // Fingir que somos um browser real para o Cloudflare não desconfiar
         const options = {
           headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
         };
@@ -42,7 +45,6 @@ jobs:
               process.exit(1);
             }
             
-            // Limpar os títulos (ignorar o primeiro que é o título do RSS)
             const filmes = matches
               .map(m => m.replace('<title><![CDATA[', '').replace(']]></title>', ''))
               .filter(t => t !== 'Watchlist');
