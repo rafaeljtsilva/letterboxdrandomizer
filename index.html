@@ -49,13 +49,13 @@
 
 <div class="container">
     <h1>🎬 Letterboxd Watchlist Picker</h1>
-    <p>Vai buscar 28 filmes aleatórios de toda a tua lista e sorteia 3!</p>
+    <p>A extrair filmes diretamente da tua página de Shuffle!</p>
     
     <input type="text" id="username" value="rafaeljtsilva" placeholder="Teu username do Letterboxd">
     <br>
     <button onclick="carregarWatchlist()">🎲 Sortear 3 Filmes</button>
     
-    <div id="loading">A baralhar e a carregar a tua Watchlist...</div>
+    <div id="loading">A abrir o Letterboxd e a pescar os teus filmes...</div>
     <div id="lista-filmes"></div>
 </div>
 
@@ -69,39 +69,65 @@ async function carregarWatchlist() {
     document.getElementById('loading').style.display = 'block';
     document.getElementById('lista-filmes').innerHTML = '';
 
-    // O TRUQUE: Pedir a página já baralhada pelo Letterboxd!
     const urlWatchlist = `https://letterboxd.com/${username}/watchlist/by/shuffle/`;
-    const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlWatchlist)}`;
+    
+    // Mudámos para o corsproxy.io que não mascara nem deforma o HTML original
+    const urlProxy = `https://corsproxy.io/?${encodeURIComponent(urlWatchlist)}`;
 
     try {
         const resposta = await fetch(urlProxy);
-        if (!resposta.ok) throw new Error();
+        if (!resposta.ok) throw new Error("Erro na rede");
         
-        const dados = await resposta.json();
-        const htmlBruto = dados.contents;
+        const htmlBruto = await resposta.text();
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlBruto, "text/html");
         
-        // Captura os posters da página baralhada
-        const posters = doc.querySelectorAll('.poster img');
+        // Alvo 1: Divs que contêm o poster do filme (o Letterboxd guarda o título no 'data-film-slug' ou nos 'img')
+        const posters = doc.querySelectorAll('.poster, .film-poster');
         
         todosFilmes = [];
-        posters.forEach(img => {
-            const titulo = img.getAttribute('alt');
-            if (titulo) {
+        
+        posters.forEach(div => {
+            // Tenta ir buscar o nome de várias formas para garantir que apanha
+            let titulo = "";
+            
+            const img = div.querySelector('img');
+            if (img && img.getAttribute('alt')) {
+                titulo = img.getAttribute('alt');
+            } else if (div.getAttribute('data-film-slug')) {
+                // Se não houver imagem, limpamos o slug (ex: "pulp-fiction" vira "Pulp Fiction")
+                let slug = div.getAttribute('data-film-slug');
+                titulo = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            }
+            
+            if (titulo && !todosFilmes.includes(titulo)) {
                 todosFilmes.push(titulo);
             }
         });
 
         if (todosFilmes.length === 0) {
-            alert("Não encontrámos filmes. Confirma se o teu username está correto e se tens filmes públicos na Watchlist!");
+            // Se falhou tudo, vamos tentar procurar por links de filmes na página
+            const links = doc.querySelectorAll('a');
+            links.forEach(l => {
+                if(l.href && l.href.includes('/film/')) {
+                    let partes = l.href.split('/film/');
+                    if(partes[1]) {
+                        let nome = partes[1].replace(/\//g, '').split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                        if(nome && nome.length < 40 && !todosFilmes.includes(nome)) todosFilmes.push(nome);
+                    }
+                }
+            });
+        }
+
+        if (todosFilmes.length === 0) {
+            alert("O Letterboxd enviou uma página vazia. Tenta clicar no botão mais uma vez!");
         } else {
             sortearFilmesNativos();
         }
     } catch (erro) {
         console.error(erro);
-        alert("Erro ao aceder ao Letterboxd através do proxy. Tenta clicar novamente!");
+        alert("O servidor falhou a responder. Tenta de novo!");
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
@@ -109,11 +135,11 @@ async function carregarWatchlist() {
 
 function sortearFilmesNativos() {
     if (todosFilmes.length < 3) {
-        alert("Tens menos de 3 filmes na lista!");
+        alert("Encontrámos poucos filmes na página. Garante que tens a lista bem preenchida!");
         return;
     }
     
-    // Como a lista já veio baralhada pelo Letterboxd, pegamos logo nos 3 primeiros da página
+    // Mostra os 3 primeiros da página baralhada
     const sorteados = todosFilmes.slice(0, 3);
     
     const container = document.getElementById('lista-filmes');
@@ -124,8 +150,8 @@ function sortearFilmesNativos() {
             <div class="filme-card">
                 <span class="filme-titulo">${filme}</span>
                 <div>
-                    <button style="margin:0 2px; padding:5px 10px; font-size:12px;" onclick="alert('Mais filmes como este!')">👍 Mais</button>
-                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; background:#ff4242;" onclick="alert('Menos filmes como este!')">👎 Menos</button>
+                    <button style="margin:0 2px; padding:5px 10px; font-size:12px;" onclick="alert('Mais como este!')">👍 Mais</button>
+                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; background:#ff4242;" onclick="alert('Menos como este!')">👎 Menos</button>
                 </div>
             </div>
         `;
