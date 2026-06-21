@@ -11,50 +11,130 @@
             color: #9ab;
             text-align: center;
             padding: 20px;
+            margin: 0;
         }
         .container {
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
             background: #1c252d;
             padding: 30px;
             border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        h1 { color: #fff; }
+        h1 { color: #fff; margin-bottom: 20px; }
+        
         .instrucoes {
             text-align: left;
             background: #24303c;
             padding: 15px;
             border-radius: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             font-size: 14px;
             line-height: 1.6;
         }
         .instrucoes a { color: #00e054; text-decoration: none; font-weight: bold; }
+        
         input[type="file"] {
-            margin: 20px 0;
+            margin-bottom: 20px;
             color: #fff;
             background: #24303c;
-            padding: 10px;
+            padding: 12px;
             border-radius: 5px;
             cursor: pointer;
+            border: 1px dashed #445566;
         }
-        .filme-card {
-            background: #24303c;
-            margin: 15px 0;
-            padding: 15px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 5px solid #ff8000;
-        }
-        .filme-titulo { color: #fff; font-size: 18px; font-weight: bold; text-align: left; }
+        
         button.sortear {
-            background: #00e054; color: #fff; padding: 12px 24px; font-size: 16px;
-            border-radius: 5px; border: none; cursor: pointer; font-weight: bold; margin-bottom: 15px;
+            background: #00e054; color: #fff; padding: 14px 28px; font-size: 18px;
+            border-radius: 5px; border: none; cursor: pointer; font-weight: bold; margin-bottom: 25px;
+            transition: background 0.2s;
         }
         button.sortear:hover { background: #00b342; }
+
+        /* GRELHA DOS TRÊS RETÂNGULOS LADO A LADO */
+        .grid-filmes {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .filme-card {
+            background: #24303c;
+            width: 210px; /* Largura padrão de poster */
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.2s;
+            border-bottom: 4px solid #ff8000;
+        }
+        .filme-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        /* Capa do Filme (Retângulo 2:3) */
+        .filme-poster {
+            width: 100%;
+            height: 315px;
+            object-fit: cover;
+            background: #344454;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #678;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 10px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .filme-info {
+            padding: 15px;
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            justify-content: space-between;
+        }
+        
+        .filme-titulo {
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            min-height: 40px; /* Garante alinhamento mesmo com títulos longos */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .botoes-voto {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        .btn-voto {
+            padding: 8px 16px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            flex-grow: 1;
+            transition: opacity 0.2s;
+        }
+        .btn-voto:hover { opacity: 0.8; }
+        .btn-mais { background: #00e054; }
+        .btn-menos { background: #ff4242; }
     </style>
 </head>
 <body>
@@ -63,21 +143,28 @@
     <h1>🎬 Letterboxd Watchlist Picker</h1>
     
     <div class="instrucoes">
-        <strong>Como o Letterboxd bloqueia o site, faz isto (leva 10 segundos):</strong>
+        <strong>Como usar:</strong>
         <ol>
-            <li>Entra em <a href="https://letterboxd.com/settings/data/" target="_blank">Letterboxd Settings > Data</a> e clica em <strong>"Export Your Data"</strong>.</li>
-            <li>Abre o ZIP descarregado e arrasta o ficheiro <strong>watchlist.csv</strong> para aqui:</li>
+            <li>Vai a <a href="https://letterboxd.com/settings/data/" target="_blank">Letterboxd > Data</a> e clica em <strong>"Export Your Data"</strong>.</li>
+            <li>Extrai o ZIP e carrega aqui o ficheiro <strong>watchlist.csv</strong>:</li>
         </ol>
     </div>
     
     <input type="file" id="csvFile" accept=".csv">
+    
     <div id="zona-sorteio" style="display:none;">
         <button class="sortear" onclick="sortearFilmes()">🎲 Baralhar e Sortear 3</button>
     </div>
-    <div id="lista-filmes"></div>
+    
+    <div id="lista-filmes" class="grid-filmes"></div>
 </div>
 
 <script>
+// ==========================================
+// 🔑 COLA A TUA CHAVE DA API DO TMDB AQUI:
+const TMDB_API_KEY = '15552b6ae873383f82e988c28c8a80ca'; 
+// ==========================================
+
 let todosFilmes = [];
 
 document.getElementById('csvFile').addEventListener('change', function(e) {
@@ -86,8 +173,7 @@ document.getElementById('csvFile').addEventListener('change', function(e) {
 
     const reader = new FileReader();
     reader.onload = function(evt) {
-        const conteudo = evt.target.result;
-        processarCSV(conteudo);
+        processarCSV(evt.target.result);
     };
     reader.readAsText(file);
 });
@@ -96,16 +182,14 @@ function processarCSV(texto) {
     const linhas = texto.split('\n');
     todosFilmes = [];
 
-    // O CSV do Letterboxd tem a estrutura: Date, Name, Year, Letterboxd URL
     for (let i = 1; i < linhas.length; i++) {
         const linha = linhas[i].trim();
         if (!linha) continue;
 
-        // Expressão regular para separar por vírgulas mas respeitar as aspas (filmes com vírgula no nome)
         const colunas = linha.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || linha.split(',');
         
         if (colunas && colunas[1]) {
-            let titulo = colunas[1].replace(/"/g, ''); // Limpa as aspas extra
+            let titulo = colunas[1].replace(/"/g, '');
             if (titulo !== "Name") {
                 todosFilmes.push(titulo);
             }
@@ -113,36 +197,74 @@ function processarCSV(texto) {
     }
 
     if (todosFilmes.length === 0) {
-        alert("Não encontrámos filmes. Tens a certeza que inseriste o ficheiro 'watchlist.csv'?");
+        alert("Ficheiro inválido. Garante que é o 'watchlist.csv'.");
     } else {
         document.getElementById('zona-sorteio').style.display = 'block';
         sortearFilmes();
     }
 }
 
-function sortearFilmes() {
+async function sortearFilmes() {
     if (todosFilmes.length < 3) {
-        alert("Precisas de pelo menos 3 filmes na tua lista!");
+        alert("Precisas de pelo menos 3 filmes!");
         return;
     }
     
-    // Baralha a lista completa do CSV e escolhe 3
+    // Escolhe 3 títulos aleatórios
     const sorteados = [...todosFilmes].sort(() => 0.5 - Math.random()).slice(0, 3);
-    
     const container = document.getElementById('lista-filmes');
-    container.innerHTML = '<h3>As tuas 3 opções aleatórias:</h3>';
+    container.innerHTML = ''; // Limpa o ecrã
     
-    sorteados.forEach(filme => {
+    // Gera o HTML para cada um dos 3 filmes
+    for (let filme de sorteados) {
+        let posterUrl = "";
+        
+        // Se já tiveres colocado a chave, ele vai buscar o poster à internet
+        if (TMDB_API_KEY !== 'TU_CHAVE_AQUI') {
+            posterUrl = await procurarPosterTMDB(filme);
+        }
+        
+        let elementoPoster = posterUrl 
+            ? `<img class="filme-poster" src="${posterUrl}" alt="Poster">`
+            : `<div class="filme-poster">🎬<br><br>Capa Não Disponível</div>`;
+            
         container.innerHTML += `
             <div class="filme-card">
-                <span class="filme-titulo">${filme}</span>
-                <div>
-                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; border:none; border-radius:3px; background:#00e054; color:white; font-weight:bold; cursor:pointer;" onclick="alert('Mais como este!')">👍</button>
-                    <button style="margin:0 2px; padding:5px 10px; font-size:12px; border:none; border-radius:3px; background:#ff4242; color:white; font-weight:bold; cursor:pointer;" onclick="alert('Menos como este!')">👎</button>
+                ${elementoPoster}
+                <div class="filme-info">
+                    <div class="filme-titulo">${filme}</div>
+                    <div class="botoes-voto">
+                        <button class="btn-voto btn-mais" onclick="votarMais('${filme.replace(/'/g, "\\'")}')">👍</button>
+                        <button class="btn-voto btn-menos" onclick="votarMenos('${filme.replace(/'/g, "\\'")}')">👎</button>
+                    </div>
                 </div>
             </div>
         `;
-    });
+    }
+}
+
+// Função que faz a magia de ir buscar a capa do filme ao TMDB
+async function procurarPosterTMDB(titulo) {
+    try {
+        const url = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(titulo)}&language=pt-PT`;
+        const resposta = await fetch(url);
+        const dados = await resposta.json();
+        
+        if (dados.results && dados.results.length > 0 && dados.results[0].poster_path) {
+            return `https://image.tmdb.org/t/p/w500${dados.results[0].poster_path}`;
+        }
+    } catch (e) {
+        console.error("Erro ao carregar poster do TMDB:", e);
+    }
+    return ""; // Retorna vazio se não encontrar
+}
+
+function votarMais(nomeFilme) {
+    alert(`Gostas de: ${nomeFilme}! O algoritmo vai procurar recomendações baseadas nisto.`);
+}
+
+function votarMenos(nomeFilme) {
+    alert(`Não queres ver: ${nomeFilme}. Este filme e os semelhantes serão ocultados.`);
 }
 </script>
 
