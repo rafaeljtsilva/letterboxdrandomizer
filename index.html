@@ -21,35 +21,17 @@
             border-radius: 10px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        h1 { color: #fff; margin-bottom: 20px; }
-        
-        .instrucoes {
-            text-align: left;
-            background: #24303c;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 25px;
-            font-size: 14px;
-            line-height: 1.6;
-        }
-        .instrucoes a { color: #00e054; text-decoration: none; font-weight: bold; }
-        
-        input[type="file"] {
-            margin-bottom: 20px;
-            color: #fff;
-            background: #24303c;
-            padding: 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            border: 1px dashed #445566;
-        }
+        h1 { color: #fff; margin-bottom: 5px; }
+        p.sub { color: #678; margin-bottom: 25px; font-size: 14px; }
         
         button.sortear {
-            background: #00e054; color: #fff; padding: 14px 28px; font-size: 18px;
+            background: #00e054; color: #fff; padding: 16px 32px; font-size: 18px;
             border-radius: 5px; border: none; cursor: pointer; font-weight: bold; margin-bottom: 25px;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.1s;
+            box-shadow: 0 4px 12px rgba(0, 224, 84, 0.3);
         }
-        button.sortear:hover { background: #00b342; }
+        button.sortear:hover { background: #00b342; transform: translateY(-2px); }
+        button.sortear:active { transform: translateY(0); }
 
         /* GRELHA DOS TRÊS RETÂNGULOS LADO A LADO */
         .grid-filmes {
@@ -58,6 +40,7 @@
             gap: 20px;
             flex-wrap: wrap;
             margin-top: 20px;
+            min-height: 380px;
         }
         
         .filme-card {
@@ -113,6 +96,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            line-height: 1.3;
         }
     </style>
 </head>
@@ -120,42 +104,48 @@
 
 <div class="container">
     <h1>🎬 Letterboxd Watchlist Picker</h1>
+    <p class="sub">A ler diretamente o teu ficheiro do GitHub de forma automática</p>
     
-    <div class="instrucoes">
-        <strong>Como usar:</strong>
-        <ol>
-            <li>Vai a <a href="https://letterboxd.com/settings/data/" target="_blank">Letterboxd > Data</a> e clica em <strong>"Export Your Data"</strong>.</li>
-            <li>Extrai o ZIP e carrega aqui o teu ficheiro <strong>watchlist.csv</strong>:</li>
-        </ol>
+    <div>
+        <button class="sortear" onclick="carregarESortear()">🎲 Sincronizar e Sortear 3</button>
     </div>
     
-    <input type="file" id="csvFile" accept=".csv">
-    
-    <div id="zona-sorteio" style="display:none;">
-        <button class="sortear" onclick="sortearFilmes()">🎲 Baralhar e Sortear 3</button>
+    <div id="lista-filmes" class="grid-filmes">
+        <p style="color:#678; width:100%; padding-top: 50px;">Clica no botão acima para carregar a tua watchlist!</p>
     </div>
-    
-    <div id="lista-filmes" class="grid-filmes"></div>
 </div>
 
 <script>
 // ==========================================
 // 🔑 COLA A TUA API KEY (v3 auth) DO TMDB AQUI:
-const TMDB_API_KEY = '15552b6ae873383f82e988c28c8a80ca'; 
+const TMDB_API_KEY = 'TU_CHAVE_AQUI'; 
 // ==========================================
 
 let todosFilmes = [];
 
-document.getElementById('csvFile').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-        processarCSV(evt.target.result);
-    };
-    reader.readAsText(file);
-});
+async function carregarESortear() {
+    const container = document.getElementById('lista-filmes');
+    
+    // Se for a primeira vez, vai buscar o ficheiro ao repositório
+    if (todosFilmes.length === 0) {
+        container.innerHTML = '<p style="color:#ff8000; width:100%;">A ler watchlist.csv do GitHub...</p>';
+        try {
+            // Procura o ficheiro 'watchlist.csv' que está na mesma pasta do teu site
+            const resposta = await fetch('watchlist.csv');
+            if (!resposta.ok) {
+                throw new Error("Não encontrámos o ficheiro 'watchlist.csv' no teu GitHub.");
+            }
+            const texto = await resposta.ok ? await resposta.text() : '';
+            processarCSV(texto);
+        } catch (erro) {
+            container.innerHTML = `<p style="color:#ff4242; width:100%;">${erro.message}<br><br><span style="font-size:12px; color:#678;">Garante que subiste o ficheiro com o nome exato "watchlist.csv" para o teu repositório.</span></p>`;
+            return;
+        }
+    }
+    
+    // Faz o sorteio dos filmes
+    sortearFilmes();
+}
 
 function processarCSV(texto) {
     const linhas = texto.split('\n');
@@ -165,7 +155,7 @@ function processarCSV(texto) {
         const linha = linhas[i].trim();
         if (!linha) continue;
 
-        // Separa por vírgulas, respeitando as aspas do CSV
+        // Separa por vírgulas respeitando as aspas
         const colunas = inlineMatchCSV(linha);
         
         if (colunas && colunas[1] && colunas[3]) {
@@ -180,16 +170,8 @@ function processarCSV(texto) {
             }
         }
     }
-
-    if (todosFilmes.length === 0) {
-        alert("Ficheiro inválido. Garante que inseres o 'watchlist.csv'.");
-    } else {
-        document.getElementById('zona-sorteio').style.display = 'block';
-        sortearFilmes();
-    }
 }
 
-// Função auxiliar robusta para ler as linhas do CSV sem quebrar com espaços ou vírgulas em aspas
 function inlineMatchCSV(linha) {
     const arr = [];
     let c = '';
@@ -210,16 +192,15 @@ function inlineMatchCSV(linha) {
 }
 
 async function sortearFilmes() {
+    const container = document.getElementById('lista-filmes');
     if (todosFilmes.length < 3) {
-        alert("Precisas de pelo menos 3 filmes!");
+        container.innerHTML = '<p style="color:#ff4242; width:100%;">Precisas de pelo menos 3 filmes no teu ficheiro CSV!</p>';
         return;
     }
     
-    // Baralha a lista e escolhe 3 sem qualquer restrição de histórico
-    const sorteados = [...todosFilmes].sort(() => 0.5 - Math.random()).slice(0, 3);
-    const container = document.getElementById('lista-filmes');
     container.innerHTML = '<p style="color:#ff8000; width:100%;">A carregar capas do TMDB...</p>'; 
     
+    const sorteados = [...todosFilmes].sort(() => 0.5 - Math.random()).slice(0, 3);
     let htmlGerado = '';
     
     for (let filme of sorteados) {
